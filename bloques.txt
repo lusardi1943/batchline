@@ -1,0 +1,267 @@
+<#
+.SYNOPSIS
+    Limpieza y compresion por mes con batching.
+
+.DESCRIPTION
+    Conserva archivos de los N dias mas recientes, opcionalmente elimina archivos mas antiguos que N meses,
+    comprime por lotes (batch) por mes, verifica y elimina originales tras compresion.
+#>
+
+param (
+    [Parameter(Mandatory=$true)][string]$Directorio,
+    [Parameter(Mandatory=$true)][string]$Mascara,
+    [Parameter(Mandatory=$true)][int]$Dias,
+    [Parameter(Mandatory=$false)][int]$Meses,
+    [Parameter(Mandatory=$false)][int]$MaxFilesPorLote = 1000,
+    [Parameter(Mandatory=$false)][long]$MaxBytesPorLote,
+    [Parameter(Mandatory=$false)][int]$Reintentos = 2,
+    [Parameter(Mandatory=$false)][switch]$Simular
+)
+
+# Validaciones iniciales
+if (-not (Test-Path $Directorio)) {
+    Write-Host "ERROR 101: Directorio no encontrado: $Directorio" -ForegroundColor Red
+    exit 101
+}
+if ($Dias -lt 1) {
+    Write-Host "ERROR 102: -Dias debe ser > 0" -ForegroundColor Red
+    exit 102
+}
+if ($PSBoundParameters.ContainsKey('Meses') -and $Meses -lt 1) {
+    Write-Host "ERROR 103: -Meses debe ser > 0 si se especifica" -ForegroundColor Red
+    exit 103
+}
+if ($MaxFilesPorLote -lt 1) {
+    Write-Host "ERROR 110: -MaxFilesPorLote debe ser > 0" -ForegroundColor Red
+    exit 110
+}
+if ($Reintentos -lt 0) {
+    Write-Host "ERROR 111: -Reintentos debe ser >= 0" -ForegroundColor Red
+    exit 111
+}
+
+$SevenZipPath = "C:\Program Files\7-Zip\7z.exe"
+if (-not (Test-Path $SevenZipPath)) {
+    Write-Host "ERROR 104: 7-Zip no encontrado en: $SevenZipPath" -ForegroundColor Red
+    exit 104
+}
+
+# Obtener archivos que coinciden con la mascara, ordenados desc por LastWriteTime
+$archivos = Get-ChildItem -Path $Directorio -Filter $Mascara -File | Sort-Object LastWriteTime -Descending
+
+# Preparar log
+$logPath = Join-Path $Directorio ("Historial_Limpieza_{0}.txt" -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
+$log = New-Object System.Collections.Generic.List[string]
+$log.Add("=== HISTORIAL DE LIMPIEZA Y COMPRESION (BATCH) ===")
+$log.Add(("Fecha: {0}" -f (Get-Date)))
+$log.Add(("Directorio: {0}" -f $Directorio))
+$log.Add(("Mascara: {0}" -f $Mascara))
+$log.Add(("Dias a conservar: {0}" -f $Dias))
+if ($PSBoundParameters.ContainsKey('Meses')) { $log.Add(("Meses (corte): {0}" -f $Meses)) }
+$log.Add(("MaxFilesPorLote: {0}" -f $MaxFilesPorLote))
+if ($PSBoundParameters.ContainsKey('MaxBytesPorLote')) { $log.Add(("MaxBytesPorLote (bytes): {0}" -f $MaxBytesPorLote)) }
+$log.Add(("Reintentos por lote: {0}" -f $Reintentos))
+$log.Add(("Modo Simulacion: {0}" -f $Simular.IsPresent))
+$log.Add(("Total archivos encontrados inicialmente: {0}" -f $archivos.Count))
+$log.Add("")
+
+# Eliminacion previa por antiguedad (si aplica)
+if ($PSBoundParameters.ContainsKey('Meses')) {
+    $fechaCorte = (Get-Date).AddMonths(-$Meses)
+    $log.Add(("Eliminacion previa por antiguedad: eliminar archivos con LastWriteTime < {0}" -f $fechaCorte))
+
+    $archivosFueraMeses = $archivos | Where-Object { $_.LastWriteTime -lt $fechaCorte }
+    $log.Add(("Identificados para eliminacion por antiguedad: {0}" -f $archivosFueraMeses.Count))
+
+    foreach ($f in $archivosFueraMeses) {
+        $msg = ("ELIMINAR por antiguedad: {0} | Fecha: {1} | Ruta: {2}" -f $f.Name, $f.LastWriteTime, $f.FullName)
+        if ($Simular.IsPresent) {
+            $log.Add(("[SIMULAR] {0}" -f $msg))
+        } else {
+            try {
+                Remove-Item -Path $f.FullName -Force
+                $log.Add($msg)
+            } catch {
+                $log.Add(("ERROR eliminar por antiguedad: {0} | EX: {1}" -f $f.FullName, $_.Exception.Message))
+            }
+        }
+    }
+
+    # Actualizar la lista de archivos sobre la que operaremos
+    $archivos = $archivos | Where-Object { $_.LastWriteTime -ge $fechaCorte } | Sort-Object LastWriteTime -Descending
+    $log.Add(("Archivos restantes tras corte por meses: {0}" -f $archivos.Count))
+    $log.Add("")
+}
+
+# Seleccion de N dias unicos a conservar
+$diasSeleccionados = $archivos | Group-Object { $_.LastWriteTime.Date } | Select-Object -First $Dias
+$archivosConservar = $diasSeleccionados | ForEach-Object { $_.Group } | Select-Object -ExpandProperty FullName
+$archivosEliminar = $archivos | Where-Object { $archivosConservar -notcontains $_.FullName }
+
+$log.Add(("Dias unicos seleccionados (conservar): {0}" -f $diasSeleccionados.Count))
+$log.Add(("Archivos conservados (conteo): {0}" -f $archivosConservar.Count))
+$log.Add(("Archivos candidatos a compresion/eliminacion: {0}" -f $archivosEliminar.Count))
+$log.Add("")
+
+$log.Add("Listado (parcial) archivos conservados:")
+$archivos | Where-Object { $archivosConservar -contains $_.FullName } | Select-Object -First 200 | ForEach-Object {
+    $log.Add((" - {0} | {1} | {2} KB" -f $_.Name, $_.LastWriteTime, [Math]::Round($_.Length/1KB,2)))
+}
+$log.Add("")
+
+# Funcion para crear lotes
+function Crear-Lotes {
+    param($files, $maxCount, $maxBytes)
+    $lotes = @()
+    if (-not $files) { return $lotes }
+    $currentBatch = @()
+    $currentBytes = 0L
+
+    foreach ($f in $files) {
+        $fSize = if ($f.Length -is [long]) { $f.Length } else { 0L }
+        $needNewBatchByCount = ($currentBatch.Count -ge $maxCount)
+        $needNewBatchBySize = $false
+        if ($PSBoundParameters.ContainsKey('MaxBytesPorLote') -and $maxBytes -gt 0) {
+            $needNewBatchBySize = (($currentBytes + $fSize) -gt $maxBytes)
+        }
+        if ($needNewBatchByCount -or $needNewBatchBySize) {
+            $lotes += ,([System.Collections.ArrayList]$currentBatch)
+            $currentBatch = @()
+            $currentBytes = 0L
+        }
+        $currentBatch += $f
+        $currentBytes += $fSize
+    }
+    if ($currentBatch.Count -gt 0) { $lotes += ,([System.Collections.ArrayList]$currentBatch) }
+    return $lotes
+}
+
+# Batching: compresion por lotes dentro de cada mes
+if ($archivosEliminar.Count -gt 0) {
+    $log.Add("Iniciando compresion por lotes agrupada por mes...")
+    $gruposPorMes = $archivosEliminar | Group-Object { $_.LastWriteTime.ToString("yyyy_MM") } | Sort-Object Name -Descending
+
+    foreach ($grupo in $gruposPorMes) {
+        $mesName = $grupo.Name
+        $filesInGroup = $grupo.Group
+        $log.Add(("Grupo mes: {0} | Archivos en grupo: {1}" -f $mesName, $filesInGroup.Count))
+
+        $lotes = Crear-Lotes -files $filesInGroup -maxCount $MaxFilesPorLote -maxBytes $MaxBytesPorLote
+        $log.Add(("Lotes creados para {0}: {1}" -f $mesName, $lotes.Count))
+
+        for ($i = 0; $i -lt $lotes.Count; $i++) {
+            $lote = $lotes[$i]
+            $loteCount = $lote.Count
+            $loteTotalBytes = ($lote | Measure-Object -Property Length -Sum).Sum
+            $nombre7z = ("{0}.7z" -f $mesName)
+            $ruta7z = Join-Path $Directorio $nombre7z
+            $tempList = Join-Path $env:TEMP ("lista_7z_{0}_{1}_{2}.txt" -f $mesName, $i, (Get-Random))
+
+            # Escribir lista de rutas al archivo temporal
+            $lote | ForEach-Object { $_.FullName } | Set-Content -Path $tempList -Encoding UTF8
+
+            $log.Add(("Lote {0} para {1}: archivos={2}, bytes={3}, tempList={4}, destino={5}" -f $i, $mesName, $loteCount, $loteTotalBytes, $tempList, $ruta7z))
+
+            $intento = 0
+            $exitoLote = $false
+            while ($intento -le $Reintentos -and -not $exitoLote) {
+                $intento++
+                $log.Add(("  Intento {0} para lote {1} ({2})" -f $intento, $i, $mesName))
+
+                if ($Simular.IsPresent) {
+                    $log.Add(("  [SIMULAR] Ejecutaria: 7z a -t7z ""{0}"" @""{1}"" -mx=9" -f $ruta7z, $tempList))
+                    $exitoLote = $true
+                    break
+                }
+
+                try {
+                    $args = "a -t7z `"$ruta7z`" @`"$tempList`" -mx=9"
+                    $proc = Start-Process -FilePath $SevenZipPath -ArgumentList $args -NoNewWindow -Wait -PassThru
+                    Start-Sleep -Milliseconds 300
+
+                    if (Test-Path $ruta7z) {
+                        $info7z = Get-Item $ruta7z
+                        if ($info7z.Length -gt 0) {
+                            $exitoLote = $true
+                            $log.Add(("  OK: .7z creado/actualizado: {0} | tamaño: {1} bytes" -f $ruta7z, $info7z.Length))
+                        } else {
+                            $log.Add(("  WARNING: .7z creado pero tamaño 0 bytes: {0}" -f $ruta7z))
+                        }
+                    } else {
+                        $exitCode = if ($proc) { $proc.ExitCode } else { "N/A" }
+                        $log.Add(("  ERROR: .7z NO encontrado luego de 7z. ExitCode: {0}" -f $exitCode))
+                    }
+                } catch {
+                    $log.Add(("  EXCEPCION al ejecutar 7z para lote {0} ({1}): {2}" -f $i, $mesName, $_.Exception.Message))
+                }
+            }
+
+            # Si el lote se comprimio correctamente, eliminar archivos del lote
+            if ($exitoLote) {
+                foreach ($f in $lote) {
+                    $msg = ("   ELIMINAR (tras compresion): {0} | Fecha: {1} | Ruta: {2}" -f $f.Name, $f.LastWriteTime, $f.FullName)
+                    if ($Simular.IsPresent) {
+                        $log.Add(("[SIMULAR] {0}" -f $msg))
+                    } else {
+                        try {
+                            if (Test-Path $f.FullName) {
+                                Remove-Item -Path $f.FullName -Force
+                                $log.Add($msg)
+                            } else {
+                                $log.Add(("   SKIPPED (no encontrado al eliminar): {0}" -f $f.FullName))
+                            }
+                        } catch {
+                            $log.Add(("   ERROR al eliminar tras compresion: {0} | EX: {1}" -f $f.FullName, $_.Exception.Message))
+                        }
+                    }
+                }
+            } else {
+                $log.Add(("  FALLO lote {0} para {1} luego de {2} reintentos. No se eliminaran archivos del lote." -f $i, $mesName, $Reintentos))
+            }
+
+            # Limpiar archivo temporal
+            try { if (Test-Path $tempList) { Remove-Item -Path $tempList -Force -ErrorAction SilentlyContinue } } catch {}
+        } # end foreach lote
+
+        $log.Add("")
+    } # end foreach mes
+} else {
+    $log.Add("No hay archivos candidatos a compresion despues de la seleccion de dias y/o corte por meses.")
+    $log.Add("")
+}
+
+# Limpieza final de .7z antiguos (si aplica)
+if ($PSBoundParameters.ContainsKey('Meses')) {
+    $log.Add(("Limpieza final de .7z para conservar solo {0} meses mas recientes (por nombre yyyy_MM)." -f $Meses))
+    $archivos7z = Get-ChildItem -Path $Directorio -Filter "*.7z" -File | Where-Object { $_.BaseName -match '^\d{4}_\d{2}$' } | Sort-Object Name -Descending
+    $nombresMeses = $archivos7z | Select-Object -ExpandProperty BaseName | Select-Object -First $Meses
+    $archivos7zEliminar = $archivos7z | Where-Object { $nombresMeses -notcontains $_.BaseName }
+
+    $log.Add((" .7z detectados: {0}. A eliminar: {1}" -f $archivos7z.Count, $archivos7zEliminar.Count))
+    foreach ($archivo in $archivos7zEliminar) {
+        $msg = ("  ELIMINAR .7z antiguo: {0} | Ruta: {1}" -f $archivo.Name, $archivo.FullName)
+        if ($Simular.IsPresent) {
+            $log.Add(("[SIMULAR] {0}" -f $msg))
+        } else {
+            try {
+                Remove-Item -Path $archivo.FullName -Force
+                $log.Add($msg)
+            } catch {
+                $log.Add(("  ERROR al eliminar .7z: {0} | EX: {1}" -f $archivo.FullName, $_.Exception.Message))
+            }
+        }
+    }
+    $log.Add("")
+}
+
+# Guardar log
+try {
+    $log | Out-File -FilePath $logPath -Encoding UTF8
+    Write-Host ("Finalizado. Log: {0}" -f $logPath)
+    if ($Simular.IsPresent) {
+        Write-Host "Modo SIMULACION: no se realizaron eliminaciones ni compresiones reales." -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host ("ERROR al guardar log: {0}" -f $_.Exception.Message) -ForegroundColor Red
+    exit 200
+}
