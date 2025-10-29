@@ -1,0 +1,155 @@
+<#
+DOCUMENTACIÓN DETALLADA DEL SCRIPT DE LIMPIEZA Y COMPRESIÓN DE ARCHIVOS
+
+.SINOPSIS
+Este script automatiza la limpieza de archivos en un directorio, conservando los archivos modificados en los N días únicos más recientes y comprimiendo el resto agrupado por mes. También permite conservar solo los archivos comprimidos (.7z) de los N meses más recientes.
+
+.FUNCIONALIDAD GENERAL
+1. Validación de parámetros y entorno.
+2. Identificación de archivos recientes a conservar.
+3. Agrupación y compresión de archivos restantes por mes.
+4. Eliminación de archivos originales tras compresión.
+5. Eliminación de archivos .7z antiguos si se especifica -Meses.
+6. Generación de un log detallado con trazabilidad completa.
+
+.PARAMETROS
+- Directorio [string]: Ruta del directorio a procesar.
+- Mascara [string]: Filtro de archivos (ej. *.log, *.txt).
+- Dias [int]: Número de días únicos de modificación a conservar.
+- Meses [int, opcional]: Número de meses únicos a conservar en archivos .7z.
+#>
+
+param (
+    [Parameter(Mandatory=$true)]
+    [string]$Directorio,
+
+    [Parameter(Mandatory=$true)]
+    [string]$Mascara,
+
+    [Parameter(Mandatory=$true)]
+    [int]$Dias,
+
+    [Parameter(Mandatory=$false)]
+    [int]$Meses
+)
+
+# Validaciones iniciales
+if (!(Test-Path $Directorio)) {
+    Write-Host "ERROR 101: El directorio especificado no existe: $Directorio" -ForegroundColor Red
+    exit 101
+}
+
+if ($Dias -lt 1) {
+    Write-Host "ERROR 102: El parámetro -Dias debe ser un entero positivo mayor que cero." -ForegroundColor Red
+    exit 102
+}
+
+if ($PSBoundParameters.ContainsKey('Meses') -and $Meses -lt 1) {
+    Write-Host "ERROR 103: El parámetro -Meses debe ser un entero positivo mayor que cero." -ForegroundColor Red
+    exit 103
+}
+
+$7zipExe = "C:\Program Files\7-Zip\7z.exe"
+if (!(Test-Path $7zipExe)) {
+    Write-Host "ERROR 104: No se encontró el ejecutable de 7-Zip en: $7zipExe" -ForegroundColor Red
+    exit 104
+}
+
+# Obtención de archivos según la máscara
+$archivos = Get-ChildItem -Path $Directorio -Filter $Mascara -File | Sort-Object LastWriteTime -Descending
+
+# Agrupación por día y selección de los N días más recientes
+$diasSeleccionados = $archivos | Group-Object { $_.LastWriteTime.Date } | Select-Object -First $Dias
+$archivosConservar = $diasSeleccionados | ForEach-Object { $_.Group } | Select-Object -ExpandProperty FullName
+$archivosEliminar = $archivos | Where-Object { $archivosConservar -notcontains $_.FullName }
+
+# Inicialización del log
+$logPath = Join-Path $Directorio "Historial_Limpieza_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
+$log = @()
+$log += "=== HISTORIAL DE LIMPIEZA DE ARCHIVOS ==="
+$log += "Fecha de ejecución: $(Get-Date)"
+$log += "Directorio analizado: $Directorio"
+$log += "Máscara utilizada: $Mascara"
+$log += "Días únicos de modificación conservados: $Dias"
+if ($PSBoundParameters.ContainsKey('Meses')) {
+    $log += "Meses únicos de archivos comprimidos conservados: $Meses"
+}
+$log += ""
+
+# Registro de archivos conservados
+$log += "Archivos conservados:"
+foreach ($archivo in $archivos | Where-Object { $archivosConservar -contains $_.FullName }) {
+    $log += " - $($archivo.Name) | Fecha modificación: $($archivo.LastWriteTime) | Tamaño: $([Math]::Round($archivo.Length / 1KB, 2)) KB | Ruta: $($archivo.FullName)"
+}
+$log += ""
+
+# Compresión por grupo mensual
+if ($archivosEliminar.Count -gt 0) {
+    $log += "Compresión por grupo mensual (modo añadir):"
+    $gruposPorMes = $archivosEliminar | Group-Object { $_.LastWriteTime.ToString("yyyy_MM") }
+
+    foreach ($grupo in $gruposPorMes) {
+        $nombreArchivo7z = "$($grupo.Name).7z"
+        $rutaArchivo7z = Join-Path $Directorio $nombreArchivo7z
+        $tempListPath = Join-Path $env:TEMP "lista_7z_$($grupo.Name)_$(Get-Random).txt"
+
+        $grupo.Group | ForEach-Object { $_.FullName } | Set-Content -Path $tempListPath -Encoding UTF8
+        $argumentos = "a -t7z `"$rutaArchivo7z`" @`"$tempListPath`" -mx=9"
+
+        try {
+            $proceso = Start-Process -FilePath $7zipExe -ArgumentList $argumentos -NoNewWindow -Wait -PassThru
+            Start-Sleep -Milliseconds 500
+
+            if (Test-Path $rutaArchivo7z) {
+                foreach ($archivo in $grupo.Group) {
+                    $log += " - $($archivo.Name) | Fecha modificación: $($archivo.LastWriteTime) | Ruta: $($archivo.FullName) | Añadido a: $rutaArchivo7z"
+                }
+            } else {
+                $log += " - ERROR: No se creó el archivo $rutaArchivo7z. Código de salida: $($proceso.ExitCode)"
+            }
+        } catch {
+            $log += " - ERROR crítico al ejecutar 7-Zip: $($_.Exception.Message)"
+        } finally {
+            if (Test-Path $tempListPath) {
+                Remove-Item $tempListPath -Force
+            }
+        }
+    }
+
+    # Eliminación de archivos originales tras compresión
+    $log += ""
+    $log += "Archivos eliminados:"
+    foreach ($archivo in $archivosEliminar) {
+        try {
+            Remove-Item -Path $archivo.FullName -Force
+            $log += " - $($archivo.Name) | Fecha modificación: $($archivo.LastWriteTime) | Ruta: $($archivo.FullName) | Estado: ELIMINADO"
+        } catch {
+            $log += " - $($archivo.Name) | Ruta: $($archivo.FullName) | ERROR al eliminar: $_"
+        }
+    }
+    $log += ""
+}
+
+# Eliminación de archivos .7z fuera del rango de meses
+if ($PSBoundParameters.ContainsKey('Meses')) {
+    $log += "Evaluación de archivos .7z por mes/año:"
+    $archivos7z = Get-ChildItem -Path $Directorio -Filter "*.7z" -File |
+        Where-Object { $_.BaseName -match '^\d{4}_\d{2}$' } |
+        Sort-Object Name -Descending
+
+    $nombresMeses = $archivos7z | Select-Object -ExpandProperty BaseName | Select-Object -First $Meses
+    $archivos7zEliminar = $archivos7z | Where-Object { $nombresMeses -notcontains $_.BaseName }
+
+    foreach ($archivo in $archivos7zEliminar) {
+        try {
+            Remove-Item -Path $archivo.FullName -Force
+            $log += " - $($archivo.Name) | Estado: ELIMINADO (fuera de los $Meses meses más recientes)"
+        } catch {
+            $log += " - $($archivo.Name) | ERROR al eliminar: $_"
+        }
+    }
+    $log += ""
+}
+
+# Guardar log final
+$log | Out-File -FilePath $logPath -Encoding UTF8
