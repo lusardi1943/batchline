@@ -73,8 +73,12 @@ if (!(Test-Path $7zipExe)) {
 # Obtener todos los archivos que coincidan con la máscara; tipo de $archivos: [FileInfo[]]
 $archivos = Get-ChildItem -Path $Directorio -Filter $Mascara -File | Sort-Object LastWriteTime -Descending
 
-# Preparar ruta del log con timestamp (Tipo: string)
-$logPath = Join-Path $Directorio "Historial_Limpieza_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
+# Obtener la ruta del script actual
+$rutaScript = $MyInvocation.MyCommand.Path
+$directorioScript = Split-Path -Path $rutaScript -Parent
+
+# Definir la ruta del log en el mismo directorio del script
+$logPath = Join-Path $directorioScript "Historial_Limpieza_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
 
 # Inicializar array de log (Tipo: [string[]])
 $log = @()
