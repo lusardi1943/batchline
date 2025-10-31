@@ -1,3 +1,6 @@
+<<<<<<< HEAD
+Repositorio de proyectos docker para BATCHLINE
+=======
 Este script automatiza la gestión de archivos en un directorio determinado, aplicando criterios de conservación, compresión y eliminación basados en fechas de modificación. Su propósito principal es optimizar el espacio y mantener solo los archivos relevantes más recientes.
 ⚙️ Funciones principales
 Conservación por días Conserva todos los archivos que hayan sido modificados en los últimos N días únicos, ordenados por fecha descendente. Esto se basa en la fecha de modificación, no en la fecha actual.
@@ -27,3 +30,4 @@ Asegura que los parámetros -Dias y -Meses sean enteros positivos mayores que ce
 Comprueba que el ejecutable de 7-Zip esté disponible.
 
 Muestra códigos de error específicos si alguna validación falla.
+>>>>>>> 6abaf2e31d862a6f803def3311c042a946b48b35
