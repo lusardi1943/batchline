@@ -1,0 +1,57 @@
+﻿=== HISTORIAL DE LIMPIEZA DE ARCHIVOS ===
+Fecha de ejecuciÃ³n: 11/02/2025 13:01:18
+Script ubicado en: C:\aabb\BATCHLINE CONTROL\batchline\script
+Directorio analizado: c:\prueba\Trazas
+MÃ¡scara utilizada: *.txt
+DÃ­as Ãºnicos de modificaciÃ³n conservados: 2
+Meses (parÃ¡metro) especificados: 6
+
+EliminaciÃ³n inicial por antigÃ¼edad activada. Fecha de corte (excluye archivos anteriores a): 05/02/2025 13:01:18
+Total archivos identificados para eliminaciÃ³n por antigÃ¼edad: 0
+Archivos restantes tras eliminaciÃ³n por antigÃ¼edad: 21
+
+Archivos conservados (listas de los 2 dÃ­as mÃ¡s recientes):
+ - 20251028_Debug.txt | Fecha modificaciÃ³n: 10/28/2025 10:26:10 | TamaÃ±o: 165.55 KB | Ruta: C:\prueba\Trazas\20251028_Debug.txt
+ - 20251028_Error.txt | Fecha modificaciÃ³n: 10/28/2025 08:15:10 | TamaÃ±o: 1.6 KB | Ruta: C:\prueba\Trazas\20251028_Error.txt
+ - 20251028_Trace.txt | Fecha modificaciÃ³n: 10/28/2025 08:15:10 | TamaÃ±o: 352.74 KB | Ruta: C:\prueba\Trazas\20251028_Trace.txt
+ - 20251027_Debug.txt | Fecha modificaciÃ³n: 10/27/2025 23:59:12 | TamaÃ±o: 288.41 KB | Ruta: C:\prueba\Trazas\20251027_Debug.txt
+ - 20251027_Trace.txt | Fecha modificaciÃ³n: 10/27/2025 14:15:12 | TamaÃ±o: 341.62 KB | Ruta: C:\prueba\Trazas\20251027_Trace.txt
+ - 20251027_Error.txt | Fecha modificaciÃ³n: 10/27/2025 14:15:12 | TamaÃ±o: 2.4 KB | Ruta: C:\prueba\Trazas\20251027_Error.txt
+
+Iniciando compresiÃ³n por grupo mensual (modo aÃ±adir) para 15 archivos.
+ - AÃ±adido a c:\prueba\Trazas\2025_10.7z : 20251026_Debug.txt | Fecha modificaciÃ³n: 10/26/2025 23:59:46 | Ruta: C:\prueba\Trazas\20251026_Debug.txt
+ - AÃ±adido a c:\prueba\Trazas\2025_10.7z : 20251026_Error.txt | Fecha modificaciÃ³n: 10/26/2025 14:15:45 | Ruta: C:\prueba\Trazas\20251026_Error.txt
+ - AÃ±adido a c:\prueba\Trazas\2025_10.7z : 20251026_Trace.txt | Fecha modificaciÃ³n: 10/26/2025 14:15:45 | Ruta: C:\prueba\Trazas\20251026_Trace.txt
+ - AÃ±adido a c:\prueba\Trazas\2025_10.7z : 20251025_Debug.txt | Fecha modificaciÃ³n: 10/25/2025 23:59:36 | Ruta: C:\prueba\Trazas\20251025_Debug.txt
+ - AÃ±adido a c:\prueba\Trazas\2025_10.7z : 20251025_Error.txt | Fecha modificaciÃ³n: 10/25/2025 14:15:35 | Ruta: C:\prueba\Trazas\20251025_Error.txt
+ - AÃ±adido a c:\prueba\Trazas\2025_10.7z : 20251025_Trace.txt | Fecha modificaciÃ³n: 10/25/2025 14:15:35 | Ruta: C:\prueba\Trazas\20251025_Trace.txt
+ - AÃ±adido a c:\prueba\Trazas\2025_10.7z : 20251024_Debug.txt | Fecha modificaciÃ³n: 10/24/2025 23:59:43 | Ruta: C:\prueba\Trazas\20251024_Debug.txt
+ - AÃ±adido a c:\prueba\Trazas\2025_10.7z : 20251024_Error.txt | Fecha modificaciÃ³n: 10/24/2025 14:15:42 | Ruta: C:\prueba\Trazas\20251024_Error.txt
+ - AÃ±adido a c:\prueba\Trazas\2025_10.7z : 20251024_Trace.txt | Fecha modificaciÃ³n: 10/24/2025 14:15:42 | Ruta: C:\prueba\Trazas\20251024_Trace.txt
+ - AÃ±adido a c:\prueba\Trazas\2025_10.7z : 20251023_Debug.txt | Fecha modificaciÃ³n: 10/23/2025 23:59:29 | Ruta: C:\prueba\Trazas\20251023_Debug.txt
+ - AÃ±adido a c:\prueba\Trazas\2025_10.7z : 20251023_Error.txt | Fecha modificaciÃ³n: 10/23/2025 14:15:28 | Ruta: C:\prueba\Trazas\20251023_Error.txt
+ - AÃ±adido a c:\prueba\Trazas\2025_10.7z : 20251023_Trace.txt | Fecha modificaciÃ³n: 10/23/2025 14:15:28 | Ruta: C:\prueba\Trazas\20251023_Trace.txt
+ - AÃ±adido a c:\prueba\Trazas\2025_10.7z : 20251022_Debug.txt | Fecha modificaciÃ³n: 10/22/2025 23:59:42 | Ruta: C:\prueba\Trazas\20251022_Debug.txt
+ - AÃ±adido a c:\prueba\Trazas\2025_10.7z : 20251022_Error.txt | Fecha modificaciÃ³n: 10/22/2025 14:15:41 | Ruta: C:\prueba\Trazas\20251022_Error.txt
+ - AÃ±adido a c:\prueba\Trazas\2025_10.7z : 20251022_Trace.txt | Fecha modificaciÃ³n: 10/22/2025 14:15:41 | Ruta: C:\prueba\Trazas\20251022_Trace.txt
+
+Eliminando archivos originales que fueron comprimidos:
+ - ELIMINADO tras compresiÃ³n: 20251026_Debug.txt | Fecha modificaciÃ³n: 10/26/2025 23:59:46 | Ruta: C:\prueba\Trazas\20251026_Debug.txt
+ - ELIMINADO tras compresiÃ³n: 20251026_Error.txt | Fecha modificaciÃ³n: 10/26/2025 14:15:45 | Ruta: C:\prueba\Trazas\20251026_Error.txt
+ - ELIMINADO tras compresiÃ³n: 20251026_Trace.txt | Fecha modificaciÃ³n: 10/26/2025 14:15:45 | Ruta: C:\prueba\Trazas\20251026_Trace.txt
+ - ELIMINADO tras compresiÃ³n: 20251025_Debug.txt | Fecha modificaciÃ³n: 10/25/2025 23:59:36 | Ruta: C:\prueba\Trazas\20251025_Debug.txt
+ - ELIMINADO tras compresiÃ³n: 20251025_Error.txt | Fecha modificaciÃ³n: 10/25/2025 14:15:35 | Ruta: C:\prueba\Trazas\20251025_Error.txt
+ - ELIMINADO tras compresiÃ³n: 20251025_Trace.txt | Fecha modificaciÃ³n: 10/25/2025 14:15:35 | Ruta: C:\prueba\Trazas\20251025_Trace.txt
+ - ELIMINADO tras compresiÃ³n: 20251024_Debug.txt | Fecha modificaciÃ³n: 10/24/2025 23:59:43 | Ruta: C:\prueba\Trazas\20251024_Debug.txt
+ - ELIMINADO tras compresiÃ³n: 20251024_Error.txt | Fecha modificaciÃ³n: 10/24/2025 14:15:42 | Ruta: C:\prueba\Trazas\20251024_Error.txt
+ - ELIMINADO tras compresiÃ³n: 20251024_Trace.txt | Fecha modificaciÃ³n: 10/24/2025 14:15:42 | Ruta: C:\prueba\Trazas\20251024_Trace.txt
+ - ELIMINADO tras compresiÃ³n: 20251023_Debug.txt | Fecha modificaciÃ³n: 10/23/2025 23:59:29 | Ruta: C:\prueba\Trazas\20251023_Debug.txt
+ - ELIMINADO tras compresiÃ³n: 20251023_Error.txt | Fecha modificaciÃ³n: 10/23/2025 14:15:28 | Ruta: C:\prueba\Trazas\20251023_Error.txt
+ - ELIMINADO tras compresiÃ³n: 20251023_Trace.txt | Fecha modificaciÃ³n: 10/23/2025 14:15:28 | Ruta: C:\prueba\Trazas\20251023_Trace.txt
+ - ELIMINADO tras compresiÃ³n: 20251022_Debug.txt | Fecha modificaciÃ³n: 10/22/2025 23:59:42 | Ruta: C:\prueba\Trazas\20251022_Debug.txt
+ - ELIMINADO tras compresiÃ³n: 20251022_Error.txt | Fecha modificaciÃ³n: 10/22/2025 14:15:41 | Ruta: C:\prueba\Trazas\20251022_Error.txt
+ - ELIMINADO tras compresiÃ³n: 20251022_Trace.txt | Fecha modificaciÃ³n: 10/22/2025 14:15:41 | Ruta: C:\prueba\Trazas\20251022_Trace.txt
+
+EvaluaciÃ³n final de archivos .7z para conservar los 6 meses mÃ¡s recientes.
+No se encontraron .7z fuera del rango de 6 meses.
+

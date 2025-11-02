@@ -1,0 +1,18 @@
+﻿=== HISTORIAL DE LIMPIEZA DE ARCHIVOS ===
+Fecha de ejecuciÃ³n: 11/02/2025 13:03:23
+Script ubicado en: C:\aabb\BATCHLINE CONTROL\batchline\script
+Directorio analizado: c:\prueba\Trazas
+MÃ¡scara utilizada: *.txt
+DÃ­as Ãºnicos de modificaciÃ³n conservados: 2
+Meses (parÃ¡metro) no especificado - modo: eliminaciÃ³n directa sin compresiÃ³n ni limpieza de .7z
+
+Archivos conservados (listas de los 2 dÃ­as mÃ¡s recientes):
+ - 20251028_Debug.txt | Fecha modificaciÃ³n: 10/28/2025 10:26:10 | TamaÃ±o: 165.55 KB | Ruta: C:\prueba\Trazas\20251028_Debug.txt
+ - 20251028_Error.txt | Fecha modificaciÃ³n: 10/28/2025 08:15:10 | TamaÃ±o: 1.6 KB | Ruta: C:\prueba\Trazas\20251028_Error.txt
+ - 20251028_Trace.txt | Fecha modificaciÃ³n: 10/28/2025 08:15:10 | TamaÃ±o: 352.74 KB | Ruta: C:\prueba\Trazas\20251028_Trace.txt
+ - 20251027_Debug.txt | Fecha modificaciÃ³n: 10/27/2025 23:59:12 | TamaÃ±o: 288.41 KB | Ruta: C:\prueba\Trazas\20251027_Debug.txt
+ - 20251027_Error.txt | Fecha modificaciÃ³n: 10/27/2025 14:15:12 | TamaÃ±o: 2.4 KB | Ruta: C:\prueba\Trazas\20251027_Error.txt
+ - 20251027_Trace.txt | Fecha modificaciÃ³n: 10/27/2025 14:15:12 | TamaÃ±o: 341.62 KB | Ruta: C:\prueba\Trazas\20251027_Trace.txt
+
+Eliminando directamente archivos fuera del rango de 2 dÃ­as (SIN compresiÃ³n ni evaluaciÃ³n de .7z existentes):
+
