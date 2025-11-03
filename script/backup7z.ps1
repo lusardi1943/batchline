@@ -34,9 +34,9 @@ param (
     [int]$Meses
 )
 
-# -------------------------
-# VALIDACIONES INICIALES
-# -------------------------
+# -----------------------#
+# VALIDACIONES INICIALES #
+# -----------------------#
 
 # Verifica existencia del directorio objetivo
 if (!(Test-Path $Directorio)) {
@@ -63,9 +63,9 @@ if ($PSBoundParameters.ContainsKey('Meses') -and !(Test-Path $7zipExe)) {
     exit 104
 }
 
-# -------------------------
-# PREPARACIÓN DEL LOG (EN CARPETA DEL SCRIPT)
-# -------------------------
+# --------------------------------------------#
+# PREPARACIÓN DEL LOG (EN CARPETA DEL SCRIPT) #
+# --------------------------------------------#
 
 # Ruta del script y carpeta donde guardar el log
 $rutaScript = $MyInvocation.MyCommand.Path
@@ -90,9 +90,9 @@ if ($PSBoundParameters.ContainsKey('Meses')) {
 }
 $log += ""
 
-# -------------------------
-# ELIMINACIÓN PREVIA POR ANTIGÜEDAD (solo si se especifica -Meses)
-# -------------------------
+# -----------------------------------------------------------------#
+# ELIMINACIÓN PREVIA POR ANTIGÜEDAD (solo si se especifica -Meses) #
+# -----------------------------------------------------------------#
 # Objetivo: cuando -Meses está presente, eliminar primero archivos cuyo LastWriteTime sea anterior a la fecha de corte.
 if ($PSBoundParameters.ContainsKey('Meses')) {
     $fechaCorte = (Get-Date).AddMonths(-$Meses)
@@ -117,9 +117,9 @@ if ($PSBoundParameters.ContainsKey('Meses')) {
     $log += ""
 }
 
-# -------------------------
-# SELECCIÓN DE N DÍAS ÚNICOS A CONSERVAR
-# -------------------------
+# ---------------------------------------#
+# SELECCIÓN DE N DÍAS ÚNICOS A CONSERVAR #
+# ---------------------------------------#
 # Agrupar por día (ignorando hora) y conservar los primeros $Dias grupos más recientes.
 $diasSeleccionados = $archivos | Group-Object { $_.LastWriteTime.Date } | Select-Object -First $Dias
 
@@ -136,9 +136,9 @@ foreach ($archivo in $archivos | Where-Object { $archivosConservar -contains $_.
 }
 $log += ""
 
-# -------------------------
-# FLUJO PRINCIPAL: COMPRESIÓN Y/O ELIMINACIÓN
-# -------------------------
+# --------------------------------------------#
+# FLUJO PRINCIPAL: COMPRESIÓN Y/O ELIMINACIÓN #
+# --------------------------------------------#
 # Si -Meses está presente: comprimir por mes y eliminar originales; si no, eliminar directamente sin compresión.
 if ($PSBoundParameters.ContainsKey('Meses')) {
 
@@ -220,9 +220,9 @@ if ($PSBoundParameters.ContainsKey('Meses')) {
     $log += ""
 }
 
-# -------------------------
-# LIMPIEZA DE .7z ANTIGUOS (solo si se especifica -Meses)
-# -------------------------
+# --------------------------------------------------------#
+# LIMPIEZA DE .7z ANTIGUOS (solo si se especifica -Meses) #
+# --------------------------------------------------------#
 # Conserva solo los N .7z más recientes cuyo BaseName tenga formato yyyy_MM; elimina el resto.
 if ($PSBoundParameters.ContainsKey('Meses')) {
     $log += "Evaluación final de archivos .7z para conservar los $Meses meses más recientes."
@@ -255,9 +255,9 @@ if ($PSBoundParameters.ContainsKey('Meses')) {
     $log += ""
 }
 
-# -------------------------
-# GUARDAR LOG FINAL
-# -------------------------
+# ------------------#
+# GUARDAR LOG FINAL #
+# ------------------#
 # Escribe todas las líneas del array $log al archivo $logPath (UTF8) en la carpeta del script.
 try {
     $log | Out-File -FilePath $logPath -Encoding UTF8
@@ -267,6 +267,6 @@ try {
     exit 200
 }
 
-# -------------------------
-# FIN DEL SCRIPT
-# -------------------------
+# ---------------#
+# FIN DEL SCRIPT #
+# ---------------#
