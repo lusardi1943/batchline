@@ -1,0 +1,265 @@
+<#
+.SYNOPSIS
+    Convierte Excel -> CSV (solo Name, Parent Asset, Location Name).
+
+.DESCRIPCION
+    - Col A = Parent Asset (fila con A no vacía y B vacía inicia bloque).
+    - Col B = Name (filas siguientes hasta primera B vacía pertenecen al Parent Asset).
+    - Col C+ = Location Name (celda = 1 -> crear registro; 0 o vacío -> omitir).
+    - Salida: <archivo>-CSV-OK.csv (UTF-8 BOM) con plantilla fija; solo Name, Parent Asset y Location Name rellenados.
+#>
+
+# Forzar codificación UTF-8 en consola y salidas
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::InputEncoding  = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
+# Plantilla embebida (orden fijo de columnas del CSV de salida)
+$TemplateHeaders = @(
+    'ID','Name','Description','Status','Archived','Location Name','Parent Asset','Area','Barcode',
+    'Category','Primary User','Warranty Expiration Date','Additional Information','Serial Number',
+    'Assigned To','Teams','Parts','Vendors','Contractors','Acquisition cost'
+)
+
+function Write-Log {
+    param([string]$Message, [string]$LogPath)
+    $time = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    $line = "$time`t$Message"
+    Add-Content -Path $LogPath -Value $line -Encoding UTF8
+}
+
+function Escape-CsvField {
+    param([string]$value)
+    if ($null -eq $value) { return '""' }
+    $s = [string]$value
+    $s = $s -replace '"','""'
+    return '"' + $s + '"'
+}
+
+function Convert-ScientificToDecimalString {
+    param([string]$text, [System.Globalization.CultureInfo]$culture)
+    if ($null -eq $text -or $text -eq '') { return $text }
+    $t = $text.Trim()
+    if ($t -match '^[+-]?\d+([.,]\d+)?[eE][+-]?\d+$') {
+        $norm = $t -replace ',','.'
+        try {
+            $d = [double]::Parse($norm, [System.Globalization.CultureInfo]::InvariantCulture)
+            $fmt = "0.############################"
+            return $d.ToString($fmt, $culture)
+        } catch {
+            return $text
+        }
+    } else {
+        return $text
+    }
+}
+
+try {
+    # Inputs interactivos
+    $inputDir = Read-Host "Introduce el directorio donde está el archivo Excel (ruta completa)"
+    if ([string]::IsNullOrWhiteSpace($inputDir) -or -not (Test-Path $inputDir)) { throw "Directorio no válido o no existe." }
+
+    $excelFileName = Read-Host "Introduce el nombre del archivo Excel (por ejemplo datos.xlsx)"
+    if ([string]::IsNullOrWhiteSpace($excelFileName)) { throw "Nombre de archivo no proporcionado." }
+
+    $ExcelFile = Join-Path -Path $inputDir -ChildPath $excelFileName
+    if (-not (Test-Path $ExcelFile)) { throw "No se encontró el archivo Excel: $ExcelFile" }
+
+    # Forzar cultura es-ES
+    $culture = New-Object System.Globalization.CultureInfo "es-ES"
+    [System.Threading.Thread]::CurrentThread.CurrentCulture = $culture
+    [System.Threading.Thread]::CurrentThread.CurrentUICulture = $culture
+
+    # Rutas de salida
+    $excelFolder = Split-Path -Path $ExcelFile -Parent
+    $excelBase = [IO.Path]::GetFileNameWithoutExtension($ExcelFile)
+    $outCsv = Join-Path $excelFolder ("{0}-CSV-OK.csv" -f $excelBase)
+    $logFile = Join-Path $excelFolder ("{0}-CSV-OK.log" -f $excelBase)
+
+    if (Test-Path $logFile) { Remove-Item $logFile -Force }
+    Write-Log -Message "Inicio de conversión. Plantilla embebida; Excel: $ExcelFile" -LogPath $logFile
+
+    # Leer Excel: ImportExcel si está, sino COM
+    $useImportExcel = Get-Module -ListAvailable -Name ImportExcel
+    $excelHeaders = @()
+    $dataMatrix = @()
+    $rowCount = 0
+    $colCount = 0
+
+    if ($useImportExcel) {
+        Import-Module ImportExcel -ErrorAction Stop
+        $sheet = Import-Excel -Path $ExcelFile -ErrorAction Stop
+        if ($sheet.Count -eq 0) { throw "Excel vacío." }
+        $excelHeaders = $sheet[0].PSObject.Properties.Name
+        $colCount = $excelHeaders.Count
+        foreach ($r in $sheet) {
+            $rowArr = @()
+            foreach ($h in $excelHeaders) { $rowArr += [string]$r.$h }
+            $dataMatrix += ,$rowArr
+        }
+        $rowCount = $dataMatrix.Count
+    } else {
+        $excel = New-Object -ComObject Excel.Application
+        $excel.Visible = $false
+        $wb = $excel.Workbooks.Open((Resolve-Path $ExcelFile).Path)
+        $ws = $wb.Worksheets.Item(1)
+        $used = $ws.UsedRange
+        $rowCountTotal = $used.Rows.Count
+        $colCount = $used.Columns.Count
+
+        for ($c = 1; $c -le $colCount; $c++) {
+            $hdr = $ws.Cells.Item(1,$c).Text
+            if ([string]::IsNullOrWhiteSpace($hdr)) { $excelHeaders += "Column$c" } else { $excelHeaders += $hdr }
+        }
+
+        for ($r = 2; $r -le $rowCountTotal; $r++) {
+            $rowArr = @()
+            for ($c = 1; $c -le $colCount; $c++) {
+                $val = $ws.Cells.Item($r,$c).Text
+                $rowArr += [string]$val
+            }
+            $dataMatrix += ,$rowArr
+        }
+        $rowCount = $dataMatrix.Count
+
+        $wb.Close($false)
+        $excel.Quit()
+        [System.Runtime.Interopservices.Marshal]::ReleaseComObject($ws) | Out-Null
+        [System.Runtime.Interopservices.Marshal]::ReleaseComObject($wb) | Out-Null
+        [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
+    }
+
+    if ($excelHeaders.Count -lt 3) {
+        Write-Log -Message "Advertencia: menos de 3 columnas detectadas en el Excel." -LogPath $logFile
+    }
+
+    Write-Log -Message ("Encabezados Excel detectados: " + ($excelHeaders -join ', ')) -LogPath $logFile
+    Write-Log -Message ("Filas de datos (sin encabezado): $rowCount; Columnas totales: $colCount") -LogPath $logFile
+
+    # ---------------------------
+    # Lógica principal: bloques Parent Asset en Col A y Names en Col B
+    # ---------------------------
+    $created = 0
+    $skipped = 0
+    $errors = 0
+    $outputRows = New-Object System.Collections.ArrayList
+
+    $r = 0
+    while ($r -lt $rowCount) {
+        $rowArr = $dataMatrix[$r]
+        $colA = if ($rowArr.Count -ge 1) { ($rowArr[0] -as [string]).Trim() } else { '' }
+        $colB = if ($rowArr.Count -ge 2) { ($rowArr[1] -as [string]).Trim() } else { '' }
+
+        # Detectar inicio de bloque Parent Asset (A no vacío y B vacío)
+        if ($colA -ne '' -and [string]::IsNullOrWhiteSpace($colB)) {
+            $currentParent = $colA
+            Write-Log -Message ("Detectado Parent Asset: " + $currentParent + " en fila " + ($r + 2)) -LogPath $logFile
+
+            # Recolectar Names (col B) en filas siguientes hasta primera B vacía
+            $childRows = @()
+            $rChild = $r + 1
+            while ($rChild -lt $rowCount) {
+                $rowChild = $dataMatrix[$rChild]
+                $nameCell = if ($rowChild.Count -ge 2) { ($rowChild[1] -as [string]).Trim() } else { '' }
+                if ([string]::IsNullOrWhiteSpace($nameCell)) { break }
+                $childRows += ,@{ Parent = $currentParent; Name = $nameCell; RowIndex = $rChild }
+                $rChild++
+            }
+
+            # Si no hay Names asociados, avanzar y continuar
+            if ($childRows.Count -eq 0) {
+                $r = $rChild
+                continue
+            }
+
+            # Recorrer columnas de Location (C..última) por cada Parent Asset
+            for ($colIndex = 2; $colIndex -lt $colCount; $colIndex++) {
+                $locName = if ($excelHeaders.Count -gt $colIndex) { $excelHeaders[$colIndex] } else { "Location$($colIndex-1)" }
+                foreach ($child in $childRows) {
+                    $rowIdx = $child.RowIndex
+                    $rowVals = $dataMatrix[$rowIdx]
+                    $cellText = ''
+                    if ($rowVals.Count -gt $colIndex) { $cellText = $rowVals[$colIndex] } else { $cellText = '' }
+
+                    # Normalizar y parsear
+                    $cellText = Convert-ScientificToDecimalString -text $cellText -culture $culture
+                    $isNum = $false
+                    $num = 0
+                    if ($cellText -ne $null -and $cellText -ne '') {
+                        $norm = $cellText.Trim() -replace '\s','' -replace ',','.'
+                        try {
+                            $num = [double]::Parse($norm, [System.Globalization.CultureInfo]::InvariantCulture)
+                            $isNum = $true
+                        } catch {
+                            $isNum = $false
+                        }
+                    }
+
+                    # Crear registro solo si = 1 (numérico y >=1)
+                    if ($isNum -and $num -ge 1) {
+                        $outObj = [ordered]@{}
+                        foreach ($h in $TemplateHeaders) {
+                            switch -Regex ($h) {
+                                '^ID$' { $outObj[$h] = '' ; break }
+                                '^Name$' { $outObj[$h] = $child.Name; break }
+                                '^Description$' { $outObj[$h] = '' ; break }
+                                '(?i)location' { $outObj[$h] = $locName; break }
+                                '(?i)parent asset' { $outObj[$h] = $child.Parent; break }
+                                default { $outObj[$h] = '' }
+                            }
+                        }
+                        [void]$outputRows.Add((New-Object PSObject -Property $outObj))
+                        $created++
+                    } else {
+                        $skipped++
+                    }
+                }
+            }
+
+            # Avanzar r al final del bloque
+            $r = $rChild
+        } else {
+            # No es inicio de bloque, avanzar
+            $r++
+        }
+    }
+
+    # ---------------------------
+    # Escritura del CSV (UTF-8 BOM)
+    # ---------------------------
+    if ($outputRows.Count -gt 0) {
+        $lines = New-Object System.Collections.Generic.List[string]
+        $headerLine = ($TemplateHeaders | ForEach-Object { Escape-CsvField $_ }) -join ','
+        $lines.Add($headerLine)
+
+        foreach ($rObj in $outputRows) {
+            $fields = @()
+            foreach ($h in $TemplateHeaders) {
+                $val = $rObj.$h
+                if ($null -eq $val) { $val = '' }
+                $valStr = Convert-ScientificToDecimalString -text ([string]$val) -culture $culture
+                $fields += (Escape-CsvField $valStr)
+            }
+            $lines.Add(($fields -join ','))
+        }
+
+        $utf8 = [System.Text.Encoding]::UTF8
+        $preamble = $utf8.GetPreamble()
+        $allText = ($lines -join "`r`n") + "`r`n"
+        $bytes = $preamble + $utf8.GetBytes($allText)
+        [System.IO.File]::WriteAllBytes($outCsv, $bytes)
+
+        Write-Log -Message ("CSV generado: " + $outCsv + ". Registros creados: " + $created) -LogPath $logFile
+    } else {
+        Write-Log -Message "No se generaron registros. No se creó CSV." -LogPath $logFile
+    }
+
+    Write-Log -Message ("Resumen: Columnas procesadas: " + ($colCount - 2) + "; Registros creados: " + $created + "; Registros omitidos: " + $skipped + "; Errores: " + $errors) -LogPath $logFile
+    Write-Output "Conversión finalizada. CSV: $outCsv"
+    Write-Output "Log: $logFile"
+}
+catch {
+    $err = $_.Exception.Message
+    if ($logFile) { Write-Log -Message ("Fallo: " + $err) -LogPath $logFile }
+    Write-Error "Error: $err"
+}
